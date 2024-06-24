@@ -125,8 +125,6 @@ def recognise_clicked_piece(x, y, board_x, board_y, board_size):
     j = int((x - board_x) // square_size)
     return i * 8 + j
 
-
-
 # Read the FEN position
 position, active_colour, castling, en_passant, halfmove, fullmove = read_fen_position('En_Passant_fen.txt')
 
@@ -419,6 +417,13 @@ def draw_valid_moves(valid_moves, board_x, board_y, square_size):
         y = board_y + i * square_size + square_size / 2
         pygame.draw.circle(window, GREY, (int(x), int(y)), int(square_size / 4), 50)
 
+def mouse_square_location(x, y, board_size, board_x, board_y):
+    square_size = board_size / 8
+    i = int((y - board_y) // square_size)
+    j = int((x - board_x) // square_size)
+
+    return i, j, square_size
+
 def main():
     global window, window_width, window_height  # Declare window, window_width, and window_height as global variables
     running = True
@@ -449,12 +454,17 @@ def main():
         board_y = (window_height / 2 - board_size / 2)
 
         # Calculating which square the mouse is on
-        square_size = board_size / 8
-        i = int((y - board_y) // square_size)
-        j = int((x - board_x) // square_size)
+        i, j, square_size = mouse_square_location(x, y, board_size, board_x, board_y)
 
         # Checks to see if mouse is on the board
         if 0 <= i < 8 and 0 <= j < 8:
+
+            # If the mouse is clicked and no piece is selected, pick up piece
+                # If the mouse is released whilst still in the same square, or in a square that is not a valid move, keep the piece selected
+                # Else if the mouse is released whilst in a square that is a valid move, move that piece to that square
+            # Else if the mouse is clicked and a piece is selected
+                # If the mouse is clicked on a valid square, move the piece to that square
+                # Else if the mouse is clicked on a not valid move square, unselect the piece
 
             # If mouse is clicked, and there isn't currently a piece selected
             if event.type == pygame.MOUSEBUTTONDOWN and piece_selected == False:
