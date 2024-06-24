@@ -111,10 +111,10 @@ def draw_pieces(position, board_x, board_y, board_size):
                 piece_image = pygame.image.load(piece_dict[piece])
                 piece_image = pygame.transform.scale(piece_image, (int(square_size), int(square_size)))
                 window.blit(piece_image, (board_x + j * square_size, board_y + i * square_size))
-            # else:
-            #     text = font.render("None", True, WHITE)
-            #     text_rect = text.get_rect(center=(board_x + j * square_size + square_size / 2, board_y + i * square_size + square_size / 2))
-            #     window.blit(text, text_rect)
+            else:
+                text = font.render("None", True, WHITE)
+                text_rect = text.get_rect(center=(board_x + j * square_size + square_size / 2, board_y + i * square_size + square_size / 2))
+                window.blit(text, text_rect)
             text = font.render(str(i * 8 + j), True, WHITE)
             text_rect = text.get_rect(center=(board_x + j * square_size + 7, board_y + i * square_size + 7))
             window.blit(text, text_rect)          
@@ -126,7 +126,7 @@ def recognise_clicked_piece(x, y, board_x, board_y, board_size):
     return i * 8 + j
 
 # Read the FEN position
-position, active_colour, castling, en_passant, halfmove, fullmove = read_fen_position('En_Passant_fen.txt')
+position, active_colour, castling, en_passant, halfmove, fullmove = read_fen_position('En_Passant_fen_white.txt')
 
 # map the grid notation to the board index
 grid_to_index = {
@@ -244,23 +244,33 @@ def check_valid_moves(piece, position, square, en_passant=None):
         return False
 
     if piece == 'p':
+        print(f"rank: {square // 8}")
         if within_bounds(square + 8) and position[square + 8] is None:
             valid_moves.append(square + 8)
             if square < 16 and within_bounds(square + 16) and position[square + 16] is None:
                 valid_moves.append(square + 16)
-        if square % 8 != 0 and within_bounds(square + 7) and (is_opponent(piece, position[square + 7]) or en_passant_index == square + 7):
+        if square % 8 != 0 and within_bounds(square + 7) and is_opponent(piece, position[square + 7]):
             valid_moves.append(square + 7)
-        if square % 8 != 7 and within_bounds(square + 9) and (is_opponent(piece, position[square + 9]) or en_passant_index == square + 9):
+        if  en_passant_index == square + 7 and square // 8 == 4:
+            valid_moves.append(square + 7)
+        if square % 8 != 7 and within_bounds(square + 9) and is_opponent(piece, position[square + 9]):
+            valid_moves.append(square + 9)
+        if en_passant_index == square + 9 and square // 8 == 4:
             valid_moves.append(square + 9)
     
     if piece == 'P':
+        print(f"rank: {square // 8}")
         if within_bounds(square - 8) and position[square - 8] is None:
             valid_moves.append(square - 8)
             if square > 47 and within_bounds(square - 16) and position[square - 16] is None:
                 valid_moves.append(square - 16)
-        if square % 8 != 0 and within_bounds(square - 9) and (is_opponent(piece, position[square - 9]) or en_passant_index == square - 9):
+        if square % 8 != 0 and within_bounds(square - 9) and is_opponent(piece, position[square - 9]):
             valid_moves.append(square - 9)
-        if square % 8 != 7 and within_bounds(square - 7) and (is_opponent(piece, position[square - 7]) or en_passant_index == square - 7):
+        if en_passant_index == square - 9 and square // 8 == 3:
+            valid_moves.append(square - 9)
+        if square % 8 != 7 and within_bounds(square - 7) and is_opponent(piece, position[square - 7]):
+            valid_moves.append(square - 7)
+        if en_passant_index == square - 7 and square // 8 == 3:
             valid_moves.append(square - 7)
 
     if piece == 'Q' or piece == 'q' or piece == 'R' or piece == 'r':
@@ -431,7 +441,7 @@ def main():
 
     # Mouse button state and debounce time
     mouse_button_held = False
-    debounce_time = 0.2  # 200 milliseconds debounce time
+    debounce_time = 0.1  # 100 milliseconds debounce time
     last_click_time = 0
 
     draw_game()
@@ -453,40 +463,22 @@ def main():
         board_x = 25 + window_width * 0.1
         board_y = (window_height / 2 - board_size / 2)
 
-        # Calculating which square the mouse is on
         i, j, square_size = mouse_square_location(x, y, board_size, board_x, board_y)
 
-        # Checks to see if mouse is on the board
         if 0 <= i < 8 and 0 <= j < 8:
-
-            # If the mouse is clicked and no piece is selected, pick up piece
-                # If the mouse is released whilst still in the same square, or in a square that is not a valid move, keep the piece selected
-                # Else if the mouse is released whilst in a square that is a valid move, move that piece to that square
-            # Else if the mouse is clicked and a piece is selected
-                # If the mouse is clicked on a valid square, move the piece to that square
-                # Else if the mouse is clicked on a not valid move square, unselect the piece
-
-            # If mouse is clicked, and there isn't currently a piece selected
             if event.type == pygame.MOUSEBUTTONDOWN and piece_selected == False:
-                # If the click is a left click
                 if event.button == 1:
-                    # Registering the time to prevent many clicks happening at once
                     current_time = time.time()
                     if not mouse_button_held and (current_time - last_click_time > debounce_time):
                         selected_square = i * 8 + j
                         mouse_button_held = True
                         last_click_time = current_time
-                        # Draws the board without pieces
                         draw_board(board_x, board_y, board_size)
-                        # Highlights the selected square
                         pygame.draw.rect(window, (219, 194, 70, 50), (board_x + j * square_size, board_y + i * square_size, square_size + 1, square_size + 1))
-                        # Draws the pieces over the board
                         draw_pieces(position, board_x, board_y, board_size)
-                        # Draws a circle on the squares that have valid moves for the selected piece
                         if selected_square is not None:
-                            draw_valid_moves(check_valid_moves(selected_square, position, i * 8 + j), board_x, board_y, square_size)
-                        # Registers that a piece has been selected if the square has a piece on it
-                        if selected_square is not None:
+                            draw_valid_moves(check_valid_moves(position[selected_square], position, i * 8 + j), board_x, board_y, square_size)
+                        if position[selected_square] is not None:
                             piece_selected = True
                         else:
                             piece_selected = False
@@ -515,17 +507,20 @@ def main():
                         last_click_time = current_time
                         piece_selected = False
                         draw_game()
+
                 if event.button == 1:
                     current_time = time.time()
+                    x, y = pygame.mouse.get_pos()
+                    i, j, temp = mouse_square_location(x, y, board_size, board_x, board_y)
                     if not mouse_button_held and (current_time - last_click_time > debounce_time):
                         mouse_button_held = True
                         last_click_time = current_time
-                        if position[i * 8 + j] in check_valid_moves(position[selected_square], position, selected_square, en_passant_index):
-                            print(f"Clicked position: {position[i * 8 + j]}, Valid Moves: {check_valid_moves(position[selected_square], position, selected_square, en_passant_index)}")
+                        valid_moves = check_valid_moves(position[selected_square], position, selected_square, en_passant_index)
+                        if (i * 8 + j) in valid_moves:
                             position[i * 8 + j] = position[selected_square]
                             position[selected_square] = None
-                        draw_game()
                         piece_selected = False
+                        draw_game()
 
             # Check for mouse released event
             if event.type == pygame.MOUSEBUTTONUP:
