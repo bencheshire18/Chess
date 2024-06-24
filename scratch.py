@@ -126,7 +126,7 @@ def recognise_clicked_piece(x, y, board_x, board_y, board_size):
     return i * 8 + j
 
 # Read the FEN position
-position, active_colour, castling, en_passant, halfmove, fullmove = read_fen_position('En_Passant_fen.txt')
+position, active_colour, castling, en_passant, halfmove, fullmove = read_fen_position('En_Passant_fen_white.txt')
 
 # map the grid notation to the board index
 grid_to_index = {
@@ -244,23 +244,33 @@ def check_valid_moves(piece, position, square, en_passant=None):
         return False
 
     if piece == 'p':
+        print(f"rank: {square // 8}")
         if within_bounds(square + 8) and position[square + 8] is None:
             valid_moves.append(square + 8)
             if square < 16 and within_bounds(square + 16) and position[square + 16] is None:
                 valid_moves.append(square + 16)
-        if square % 8 != 0 and within_bounds(square + 7) and (is_opponent(piece, position[square + 7]) or en_passant_index == square + 7):
+        if square % 8 != 0 and within_bounds(square + 7) and is_opponent(piece, position[square + 7]):
             valid_moves.append(square + 7)
-        if square % 8 != 7 and within_bounds(square + 9) and (is_opponent(piece, position[square + 9]) or en_passant_index == square + 9):
+        if  en_passant_index == square + 7 and square // 8 == 4:
+            valid_moves.append(square + 7)
+        if square % 8 != 7 and within_bounds(square + 9) and is_opponent(piece, position[square + 9]):
+            valid_moves.append(square + 9)
+        if en_passant_index == square + 9 and square // 8 == 4:
             valid_moves.append(square + 9)
     
     if piece == 'P':
+        print(f"rank: {square // 8}")
         if within_bounds(square - 8) and position[square - 8] is None:
             valid_moves.append(square - 8)
             if square > 47 and within_bounds(square - 16) and position[square - 16] is None:
                 valid_moves.append(square - 16)
-        if square % 8 != 0 and within_bounds(square - 9) and (is_opponent(piece, position[square - 9]) or en_passant_index == square - 9):
+        if square % 8 != 0 and within_bounds(square - 9) and is_opponent(piece, position[square - 9]):
             valid_moves.append(square - 9)
-        if square % 8 != 7 and within_bounds(square - 7) and (is_opponent(piece, position[square - 7]) or en_passant_index == square - 7):
+        if en_passant_index == square - 9 and square // 8 == 3:
+            valid_moves.append(square - 9)
+        if square % 8 != 7 and within_bounds(square - 7) and is_opponent(piece, position[square - 7]):
+            valid_moves.append(square - 7)
+        if en_passant_index == square - 7 and square // 8 == 3:
             valid_moves.append(square - 7)
 
     if piece == 'Q' or piece == 'q' or piece == 'R' or piece == 'r':
