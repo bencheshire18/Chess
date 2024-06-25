@@ -1,6 +1,9 @@
 import pygame
 import os
 import time
+import cairosvg
+from io import BytesIO
+from PIL import Image
 
 # Initialize Pygame
 pygame.init()
@@ -89,35 +92,41 @@ def draw_pieces(position, board_x, board_y, board_size):
     file_path = os.path.join(script_dir, 'Piece_Sprites/')
 
     piece_dict = {
-        'r': file_path + 'bR.png',
-        'n': file_path + 'bN.png',
-        'b': file_path + 'bB.png',
-        'q': file_path + 'bQ.png',
-        'k': file_path + 'bK.png',
-        'p': file_path + 'bP.png',
-        'R': file_path + 'wR.png',
-        'N': file_path + 'wN.png',
-        'B': file_path + 'wB.png',
-        'Q': file_path + 'wQ.png',
-        'K': file_path + 'wK.png',
-        'P': file_path + 'wP.png'
+        'r': file_path + 'bR.svg',
+        'n': file_path + 'bN.svg',
+        'b': file_path + 'bB.svg',
+        'q': file_path + 'bQ.svg',
+        'k': file_path + 'bK.svg',
+        'p': file_path + 'bP.svg',
+        'R': file_path + 'wR.svg',
+        'N': file_path + 'wN.svg',
+        'B': file_path + 'wB.svg',
+        'Q': file_path + 'wQ.svg',
+        'K': file_path + 'wK.svg',
+        'P': file_path + 'wP.svg'
     }
+
     # Draw the pieces
     square_size = board_size / 8
     for i in range(8):
         for j in range(8):
             piece = position[i * 8 + j]
             if piece is not None:
-                piece_image = pygame.image.load(piece_dict[piece])
+                svg_file = piece_dict[piece]
+                # Convert SVG to PNG
+                png_data = cairosvg.svg2png(url=svg_file)
+                png_image = Image.open(BytesIO(png_data))
+                # Convert PIL image to Pygame surface
+                piece_image = pygame.image.fromstring(png_image.tobytes(), png_image.size, png_image.mode)
                 piece_image = pygame.transform.scale(piece_image, (int(square_size), int(square_size)))
                 window.blit(piece_image, (board_x + j * square_size, board_y + i * square_size))
-            else:
-                text = font.render("None", True, WHITE)
-                text_rect = text.get_rect(center=(board_x + j * square_size + square_size / 2, board_y + i * square_size + square_size / 2))
-                window.blit(text, text_rect)
-            text = font.render(str(i * 8 + j), True, WHITE)
-            text_rect = text.get_rect(center=(board_x + j * square_size + 7, board_y + i * square_size + 7))
-            window.blit(text, text_rect)          
+            # else:
+            #     text = font.render("None", True, WHITE)
+            #     text_rect = text.get_rect(center=(board_x + j * square_size + square_size / 2, board_y + i * square_size + square_size / 2))
+            #     window.blit(text, text_rect)
+            # text = font.render(str(i * 8 + j), True, WHITE)
+            # text_rect = text.get_rect(center=(board_x + j * square_size + 7, board_y + i * square_size + 7))
+            # window.blit(text, text_rect)          
 
 def recognise_clicked_piece(x, y, board_x, board_y, board_size):
     square_size = board_size / 8
@@ -126,7 +135,7 @@ def recognise_clicked_piece(x, y, board_x, board_y, board_size):
     return i * 8 + j
 
 # Read the FEN position
-position, active_colour, castling, en_passant, halfmove, fullmove = read_fen_position('En_Passant_fen_white.txt')
+position, active_colour, castling, en_passant, halfmove, fullmove = read_fen_position('En_Passant_fen_black.txt')
 
 # map the grid notation to the board index
 grid_to_index = {
@@ -244,7 +253,6 @@ def check_valid_moves(piece, position, square, en_passant=None):
         return False
 
     if piece == 'p':
-        print(f"rank: {square // 8}")
         if within_bounds(square + 8) and position[square + 8] is None:
             valid_moves.append(square + 8)
             if square < 16 and within_bounds(square + 16) and position[square + 16] is None:
@@ -259,7 +267,6 @@ def check_valid_moves(piece, position, square, en_passant=None):
             valid_moves.append(square + 9)
     
     if piece == 'P':
-        print(f"rank: {square // 8}")
         if within_bounds(square - 8) and position[square - 8] is None:
             valid_moves.append(square - 8)
             if square > 47 and within_bounds(square - 16) and position[square - 16] is None:
@@ -510,15 +517,24 @@ def main():
 
                 if event.button == 1:
                     current_time = time.time()
-                    x, y = pygame.mouse.get_pos()
-                    i, j, temp = mouse_square_location(x, y, board_size, board_x, board_y)
+
                     if not mouse_button_held and (current_time - last_click_time > debounce_time):
+                        square = i * 8 + j
+                        rank = square // 8
                         mouse_button_held = True
                         last_click_time = current_time
                         valid_moves = check_valid_moves(position[selected_square], position, selected_square, en_passant_index)
-                        if (i * 8 + j) in valid_moves:
+
+                        if square in valid_moves:
                             position[i * 8 + j] = position[selected_square]
                             position[selected_square] = None
+
+                            if square == en_passant_index:
+                                if rank == 2:
+                                    position[square + 8] = None
+                                if rank == 5:
+                                    position[square - 8] = None
+
                         piece_selected = False
                         draw_game()
 
