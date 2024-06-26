@@ -1,9 +1,7 @@
 import pygame
 import os
 import time
-import cairosvg
-from io import BytesIO
-from PIL import Image
+import sys
 
 # Initialize Pygame
 pygame.init()
@@ -42,18 +40,39 @@ class Square:
     def draw(self):
         pygame.draw.rect(window, self.colour, (self.x, self.y, self.size + 1, self.size + 1))
 
-def read_fen_position(fen_filepath):
+def read_fen_position(fen_input):
     # Get the directory of the current script
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
     # Define the path to the other file
-    file_path = os.path.join(script_dir, 'Positions', fen_filepath)
+    file_path = os.path.join(script_dir, 'Positions', fen_input)
 
-    # Open and read the file
-    with open(file_path, 'r') as file:
-        fen = file.read()
+    # Check if the input is a file path or a plain FEN string
+    if os.path.isfile(file_path):
+        # print(f"**Debug**\tDetected as filepath: {file_path}")
+        # It's a file path, read the FEN string from the file
+        try:
+            with open(file_path, 'r') as file:
+                fen_text = file.read()
+                # print(f"**Debug**\tFEN Text: {fen_text}")
+                fen = fen_text.strip()
+                # print(f"**Debug**\tStripped data: {fen}")
+        except Exception as e:
+            # print(f"**Error**\tUnable to read file: {fen_input}\n{e}")
+            return None
+    else:
+        # print(f"**Debug**\tDetected as FEN string: {fen_input}")
+        # It's a plain FEN string
+        fen_text = fen_input
+        fen = fen_input.strip()
 
+    # Split the FEN string into its components
+    # print(f"**Debug**\tFEN data: {fen}")
     params = fen.split(' ')
+    if len(params) < 6:
+        print(f"**Error**\tInvalid FEN String: {fen}")
+        return None
+    # print(f"**Debug**\tPost splitting params\tparams: {params}")
     fen = params[0]
     active_colour = params[1]
     castling = params[2]
@@ -61,6 +80,7 @@ def read_fen_position(fen_filepath):
     halfmove = params[4]
     fullmove = params[5]
 
+    # Process the board position part of the FEN string
     ranks = fen.split('/')
     position = []
     for rank in ranks:
@@ -70,7 +90,86 @@ def read_fen_position(fen_filepath):
                     position.append(None)
             else:
                 position.append(char)
-    return position, active_colour, castling, en_passant, halfmove, fullmove
+
+    return position, active_colour, castling, en_passant, halfmove, fullmove, fen_text
+
+def write_fen_position(position, active_colour, castling_availability, en_passant_target, halfmove, fullmove):
+    current_fen = ''
+    index = 0
+    is_none = False
+    counter = 0
+    
+    for square in position:
+        # Write out the position
+        if index % 8 == 0 and index != 0:
+            if is_none == True:
+                current_fen += str(counter)
+                counter = 0
+            current_fen += '/'
+        if square is not None:
+            if is_none == True:
+                if counter != 0:
+                    current_fen += str(counter)
+                is_none = False
+            current_fen += square
+        if square == None:
+            if is_none == False:
+                is_none = True
+                counter = 0
+            if is_none == True:
+                counter += 1
+        index += 1
+
+    if is_none:
+        current_fen += str(counter)
+
+    current_fen += ' '
+
+    # Add active colour
+    current_fen += active_colour
+
+    current_fen += ' '
+    
+    castling_list = []
+
+    # Add the castling availability
+    if castling_availability == '-':
+        castling_list = ['-']
+    if 'K' in castling_availability:
+        castling_list.append('K')
+    if 'k' in castling_availability:
+        castling_list.append('k')
+    if 'Q' in castling_availability:
+        castling_list.append('Q')
+    if 'q' in castling_availability:
+        castling_list.append('q')
+
+    desired_order = ['K', 'Q', 'k', 'q']
+    order_dict = {char: index for index, char in enumerate(desired_order)}
+    castling_list = sorted(set(castling_availability), key=lambda char: order_dict[char] if char in order_dict else len(desired_order))
+
+    if castling_list:
+        for item in castling_list:
+            current_fen += str(item)
+    else:
+        current_fen += '-'
+
+    current_fen += ' '
+
+    # Add the en passant target square
+    current_fen += en_passant_target
+
+    current_fen += ' '
+
+    # Add halfmove clock
+    current_fen += str(halfmove)
+
+    current_fen += ' '
+
+    # Add fullmove number
+    current_fen += str(fullmove)
+
+    return current_fen
 
 def draw_board(board_x, board_y, board_size):
     # Draw the squares
@@ -92,41 +191,35 @@ def draw_pieces(position, board_x, board_y, board_size):
     file_path = os.path.join(script_dir, 'Piece_Sprites/')
 
     piece_dict = {
-        'r': file_path + 'bR.svg',
-        'n': file_path + 'bN.svg',
-        'b': file_path + 'bB.svg',
-        'q': file_path + 'bQ.svg',
-        'k': file_path + 'bK.svg',
-        'p': file_path + 'bP.svg',
-        'R': file_path + 'wR.svg',
-        'N': file_path + 'wN.svg',
-        'B': file_path + 'wB.svg',
-        'Q': file_path + 'wQ.svg',
-        'K': file_path + 'wK.svg',
-        'P': file_path + 'wP.svg'
+        'r': file_path + 'bR.png',
+        'n': file_path + 'bN.png',
+        'b': file_path + 'bB.png',
+        'q': file_path + 'bQ.png',
+        'k': file_path + 'bK.png',
+        'p': file_path + 'bP.png',
+        'R': file_path + 'wR.png',
+        'N': file_path + 'wN.png',
+        'B': file_path + 'wB.png',
+        'Q': file_path + 'wQ.png',
+        'K': file_path + 'wK.png',
+        'P': file_path + 'wP.png'
     }
-
     # Draw the pieces
     square_size = board_size / 8
     for i in range(8):
         for j in range(8):
             piece = position[i * 8 + j]
             if piece is not None:
-                svg_file = piece_dict[piece]
-                # Convert SVG to PNG
-                png_data = cairosvg.svg2png(url=svg_file)
-                png_image = Image.open(BytesIO(png_data))
-                # Convert PIL image to Pygame surface
-                piece_image = pygame.image.fromstring(png_image.tobytes(), png_image.size, png_image.mode)
-                piece_image = pygame.transform.scale(piece_image, (int(square_size), int(square_size)))
+                piece_image = pygame.image.load(piece_dict[piece])
+                piece_image = pygame.transform.smoothscale(piece_image, (int(square_size), int(square_size)))
                 window.blit(piece_image, (board_x + j * square_size, board_y + i * square_size))
-            # else:
-            #     text = font.render("None", True, WHITE)
-            #     text_rect = text.get_rect(center=(board_x + j * square_size + square_size / 2, board_y + i * square_size + square_size / 2))
-            #     window.blit(text, text_rect)
-            # text = font.render(str(i * 8 + j), True, WHITE)
-            # text_rect = text.get_rect(center=(board_x + j * square_size + 7, board_y + i * square_size + 7))
-            # window.blit(text, text_rect)          
+            else:
+                text = font.render("None", True, WHITE)
+                text_rect = text.get_rect(center=(board_x + j * square_size + square_size / 2, board_y + i * square_size + square_size / 2))
+                window.blit(text, text_rect)
+            text = font.render(str(i * 8 + j), True, WHITE)
+            text_rect = text.get_rect(center=(board_x + j * square_size + 7, board_y + i * square_size + 7))
+            window.blit(text, text_rect)          
 
 def recognise_clicked_piece(x, y, board_x, board_y, board_size):
     square_size = board_size / 8
@@ -134,27 +227,7 @@ def recognise_clicked_piece(x, y, board_x, board_y, board_size):
     j = int((x - board_x) // square_size)
     return i * 8 + j
 
-# Read the FEN position
-position, active_colour, castling, en_passant, halfmove, fullmove = read_fen_position('En_Passant_fen_black.txt')
-
-# map the grid notation to the board index
-grid_to_index = {
-    'a8': 0, 'b8': 1, 'c8': 2, 'd8': 3, 'e8': 4, 'f8': 5, 'g8': 6, 'h8': 7,
-    'a7': 8, 'b7': 9, 'c7': 10, 'd7': 11, 'e7': 12, 'f7': 13, 'g7': 14, 'h7': 15,
-    'a6': 16, 'b6': 17, 'c6': 18, 'd6': 19, 'e6': 20, 'f6': 21, 'g6': 22, 'h6': 23,
-    'a5': 24, 'b5': 25, 'c5': 26, 'd5': 27, 'e5': 28, 'f5': 29, 'g5': 30, 'h5': 31,
-    'a4': 32, 'b4': 33, 'c4': 34, 'd4': 35, 'e4': 36, 'f4': 37, 'g4': 38, 'h4': 39,
-    'a3': 40, 'b3': 41, 'c3': 42, 'd3': 43, 'e3': 44, 'f3': 45, 'g3': 46, 'h3': 47,
-    'a2': 48, 'b2': 49, 'c2': 50, 'd2': 51, 'e2': 52, 'f2': 53, 'g2': 54, 'h2': 55,
-    'a1': 56, 'b1': 57, 'c1': 58, 'd1': 59, 'e1': 60, 'f1': 61, 'g1': 62, 'h1': 63
-}
-
-if en_passant == '-':
-    en_passant_index = -1
-else:
-    en_passant_index = grid_to_index[en_passant]
-
-def draw_game():
+def draw_game(position, active_colour, castling, en_passant, halfmove, fullmove):
     # Clear the screen
     window.fill(BACKGROUND)
 
@@ -237,7 +310,16 @@ def draw_game():
     text_rect.center = (window_width * (7/8), 400)
     window.blit(text, text_rect)
 
-def check_valid_moves(piece, position, square, en_passant=None):
+def check_valid_moves(piece, position, square, en_passant_index, castling, active_colour):
+
+    if piece is not None:
+        if active_colour == 'w':
+            if piece.islower():
+                return []
+        else:
+            if piece.isupper():
+                return []
+
     valid_moves = []
 
     def within_bounds(new_square):
@@ -408,17 +490,17 @@ def check_valid_moves(piece, position, square, en_passant=None):
 
         if piece.isupper():
             if 'K' in castling:
-                if position[5] is None and position[62] is None:
+                if position[61] is None and position[62] is None:
                     valid_moves.append(62)
             if 'Q' in castling:
-                if position[1] is None and position[58] is None and position[59] is None:
+                if position[59] is None and position[58] is None and position[57] is None:
                     valid_moves.append(58)
         elif piece.islower():
             if 'k' in castling:
-                if position[61] is None and position[6] is None:
+                if position[5] is None and position[6] is None:
                     valid_moves.append(6)
             if 'q' in castling:
-                if position[57] is None and position[2] is None and position[3] is None:
+                if position[1] is None and position[2] is None and position[3] is None:
                     valid_moves.append(2)
 
     return valid_moves
@@ -442,109 +524,69 @@ def mouse_square_location(x, y, board_size, board_x, board_y):
     return i, j, square_size
 
 def main():
-    global window, window_width, window_height  # Declare window, window_width, and window_height as global variables
-    running = True
-    piece_selected = False
+    result = read_fen_position('0.0_Position_fen.txt')
+    if result is None:
+        print(f"Error reading FEN position.\tResult: {result}")
+        sys.exit()
+    else:
+        position, active_colour, castling, en_passant, halfmove, fullmove, fen_text = result
 
-    # Mouse button state and debounce time
-    mouse_button_held = False
-    debounce_time = 0.1  # 100 milliseconds debounce time
-    last_click_time = 0
+    if en_passant == '-':
+        en_passant_index = -1
+    else:
+        en_passant_index = {
+            'a3': 40, 'b3': 41, 'c3': 42, 'd3': 43, 'e3': 44, 'f3': 45, 'g3': 46, 'h3': 47,
+            'a6': 16, 'b6': 17, 'c6': 18, 'd6': 19, 'e6': 20, 'f6': 21, 'g6': 22, 'h6': 23,
+        }[en_passant]
 
-    draw_game()
+    # Set the initial dimensions and position of the board
+    board_size = min(window_size)
+    board_x = (window_size[0] - board_size) // 2
+    board_y = (window_size[1] - board_size) // 2
 
-    while running:
+    game_running = True
+    selected_square = None
+    valid_moves = []
+    clock = pygame.time.Clock()
+
+    while game_running:
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                running = False
-            elif event.type == pygame.VIDEORESIZE:
-                window_width, window_height = event.w, event.h
-                window = pygame.display.set_mode((window_width, window_height), pygame.RESIZABLE)
-                draw_game()
-
-        # Get the mouse position
-        x, y = pygame.mouse.get_pos()
-
-        # Calculate the board size and position
-        board_size = min(window_width, window_height) * 0.8  # Board takes 80% of the smaller dimension
-        board_x = 25 + window_width * 0.1
-        board_y = (window_height / 2 - board_size / 2)
-
-        i, j, square_size = mouse_square_location(x, y, board_size, board_x, board_y)
-
-        if 0 <= i < 8 and 0 <= j < 8:
-            if event.type == pygame.MOUSEBUTTONDOWN and piece_selected == False:
-                if event.button == 1:
-                    current_time = time.time()
-                    if not mouse_button_held and (current_time - last_click_time > debounce_time):
-                        selected_square = i * 8 + j
-                        mouse_button_held = True
-                        last_click_time = current_time
-                        draw_board(board_x, board_y, board_size)
-                        pygame.draw.rect(window, (219, 194, 70, 50), (board_x + j * square_size, board_y + i * square_size, square_size + 1, square_size + 1))
-                        draw_pieces(position, board_x, board_y, board_size)
-                        if selected_square is not None:
-                            draw_valid_moves(check_valid_moves(position[selected_square], position, i * 8 + j), board_x, board_y, square_size)
-                        if position[selected_square] is not None:
-                            piece_selected = True
-                        else:
-                            piece_selected = False
-
-            if event.type == pygame.MOUSEBUTTONUP:
-                if event.button == 1 and i * 8 + j != selected_square:
-                    mouse_button_held = False
-                    if piece_selected:
-                        if i * 8 + j in check_valid_moves(position[selected_square], position, selected_square, en_passant_index):
-                            position[i * 8 + j] = position[selected_square]
-                            position[selected_square] = None
-                            draw_game()
-                            piece_selected = False
-                        else:
-                            piece_selected = False
-                            draw_game()
+                game_running = False
+            if event.type == pygame.VIDEORESIZE:
+                window_size = event.size
+                window = pygame.display.set_mode(window_size, pygame.RESIZABLE)
+                board_size = min(window_size)
+                board_x = (window_size[0] - board_size) // 2
+                board_y = (window_size[1] - board_size) // 2
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                x, y = pygame.mouse.get_pos()
+                if board_x <= x <= board_x + board_size and board_y <= y <= board_y + board_size:
+                    square = mouse_square_location(x, y, board_size, board_x, board_y)
+                    if selected_square is None:
+                        selected_square = square
+                        valid_moves = check_valid_moves(position[selected_square], position, square, en_passant_index, castling, active_colour)
                     else:
-                        draw_game()
-            
-            # Highlight the current piece and valid moves
-            if event.type == pygame.MOUSEBUTTONDOWN and piece_selected is True:
-                if event.button == 3:
-                    current_time = time.time()
-                    if not mouse_button_held and (current_time - last_click_time > debounce_time):
-                        mouse_button_held = True
-                        last_click_time = current_time
-                        piece_selected = False
-                        draw_game()
-
-                if event.button == 1:
-                    current_time = time.time()
-
-                    if not mouse_button_held and (current_time - last_click_time > debounce_time):
-                        square = i * 8 + j
-                        rank = square // 8
-                        mouse_button_held = True
-                        last_click_time = current_time
-                        valid_moves = check_valid_moves(position[selected_square], position, selected_square, en_passant_index)
-
                         if square in valid_moves:
-                            position[i * 8 + j] = position[selected_square]
+                            position[square] = position[selected_square]
                             position[selected_square] = None
+                            selected_square = None
+                            valid_moves = []
+                            active_colour = 'b' if active_colour == 'w' else fullmove
+                        else:
+                            selected_square = None
+                            valid_moves = []
 
-                            if square == en_passant_index:
-                                if rank == 2:
-                                    position[square + 8] = None
-                                if rank == 5:
-                                    position[square - 8] = None
+        window.fill(BACKGROUND)
 
-                        piece_selected = False
-                        draw_game()
+        draw_board(board_x, board_y, board_size)
+        draw_pieces(position, board_x, board_y, board_size)
+        if selected_square is not None:
+            draw_valid_moves(valid_moves, board_x, board_y, board_size / 8)
 
-            # Check for mouse released event
-            if event.type == pygame.MOUSEBUTTONUP:
-                if event.button == 1 or event.button == 3:
-                    mouse_button_held = False
-                    
-        # Update the display
-        pygame.display.flip()
+        pygame.display.update()
+
         clock.tick(60)
 
     pygame.quit()
