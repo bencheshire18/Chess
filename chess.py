@@ -7,7 +7,7 @@ import sys
 pygame.init()
 
 # Set the initial dimensions of the window
-window_width = 800
+window_width = 1200
 window_height = 600
 window_size = (window_width, window_height)
 
@@ -75,10 +75,12 @@ def read_fen_position(fen_input):
     # print(f"**Debug**\tPost splitting params\tparams: {params}")
     fen = params[0]
     active_colour = params[1]
-    castling = params[2]
+    castling_availability = []
+    for char in params[2]:
+        castling_availability.append(char)
     en_passant = params[3]
-    halfmove = params[4]
-    fullmove = params[5]
+    halfmove = int(params[4])
+    fullmove = int(params[5])
 
     # Process the board position part of the FEN string
     ranks = fen.split('/')
@@ -91,7 +93,7 @@ def read_fen_position(fen_input):
             else:
                 position.append(char)
 
-    return position, active_colour, castling, en_passant, halfmove, fullmove, fen_text
+    return position, active_colour, castling_availability, en_passant, halfmove, fullmove, fen_text
 
 def write_fen_position(position, active_colour, castling_availability, en_passant_target, halfmove, fullmove):
     current_fen = ''
@@ -132,7 +134,7 @@ def write_fen_position(position, active_colour, castling_availability, en_passan
     
     castling_list = []
 
-    # Add the castling availability
+    # Add the castling_availability availability
     if castling_availability == '-':
         castling_list = ['-']
     if 'K' in castling_availability:
@@ -227,7 +229,7 @@ def recognise_clicked_piece(x, y, board_x, board_y, board_size):
     j = int((x - board_x) // square_size)
     return i * 8 + j
 
-def draw_game(position, active_colour, castling, en_passant, halfmove, fullmove):
+def draw_game(position, active_colour, castling_availability, en_passant, halfmove, fullmove):
     # Clear the screen
     window.fill(BACKGROUND)
 
@@ -262,29 +264,29 @@ def draw_game(position, active_colour, castling, en_passant, halfmove, fullmove)
         text_rect.center = (window_width * (7/8), 50)
         window.blit(text, text_rect)
 
-    if castling != '-':
-        if 'K' in castling:
-            text = font.render("Kingside Castling available", True, WHITE)
+    if castling_availability != '-':
+        if 'K' in castling_availability:
+            text = font.render("Kingside castling_availability available", True, WHITE)
             text_rect = text.get_rect()
             text_rect.center = (window_width * (7/8), 100)
             window.blit(text, text_rect)
-        if 'k' in castling:
-            text = font.render("Queenside Castling available", True, WHITE)
+        if 'k' in castling_availability:
+            text = font.render("Queenside castling_availability available", True, WHITE)
             text_rect = text.get_rect()
             text_rect.center = (window_width * (7/8), 150)
             window.blit(text, text_rect)
-        if 'Q' in castling:
-            text = font.render("Kingside Castling available", True, WHITE)
+        if 'Q' in castling_availability:
+            text = font.render("Kingside castling_availability available", True, WHITE)
             text_rect = text.get_rect()
             text_rect.center = (window_width * (7/8), 200)
             window.blit(text, text_rect)
-        if 'q' in castling:
-            text = font.render("Queenside Castling available", True, WHITE)
+        if 'q' in castling_availability:
+            text = font.render("Queenside castling_availability available", True, WHITE)
             text_rect = text.get_rect()
             text_rect.center = (window_width * (7/8), 250)
             window.blit(text, text_rect)
-    elif castling == '-':
-        text = font.render("No Castling available", True, WHITE)
+    elif castling_availability == '-':
+        text = font.render("No castling_availability available", True, WHITE)
         text_rect = text.get_rect()
         text_rect.center = (window_width * (7/8), 100)
         window.blit(text, text_rect)
@@ -310,15 +312,15 @@ def draw_game(position, active_colour, castling, en_passant, halfmove, fullmove)
     text_rect.center = (window_width * (7/8), 400)
     window.blit(text, text_rect)
 
-def check_valid_moves(piece, position, square, en_passant_index, castling, active_colour):
+def check_valid_moves(piece, position, square, en_passant_index, castling_availability, active_colour, check=False):
 
     if piece is not None:
         if active_colour == 'w':
             if piece.islower():
-                return []
+                return [], False
         else:
             if piece.isupper():
-                return []
+                return [], False
 
     valid_moves = []
 
@@ -489,17 +491,17 @@ def check_valid_moves(piece, position, square, en_passant_index, castling, activ
                     valid_moves.append(move)
 
         if piece.isupper():
-            if 'K' in castling:
+            if 'K' in castling_availability:
                 if position[61] is None and position[62] is None:
                     valid_moves.append(62)
-            if 'Q' in castling:
+            if 'Q' in castling_availability:
                 if position[59] is None and position[58] is None and position[57] is None:
                     valid_moves.append(58)
         elif piece.islower():
-            if 'k' in castling:
+            if 'k' in castling_availability:
                 if position[5] is None and position[6] is None:
                     valid_moves.append(6)
-            if 'q' in castling:
+            if 'q' in castling_availability:
                 if position[1] is None and position[2] is None and position[3] is None:
                     valid_moves.append(2)
 
@@ -523,17 +525,47 @@ def mouse_square_location(x, y, board_size, board_x, board_y):
 
     return i, j, square_size
 
+def update_halfmove_clock(position, selected_square, halfmove_clock, was_capture):    
+    """Updates the halfmove clock based on the current move."""
+
+    try:
+        piece = position[selected_square].lower()
+    except AttributeError as e:
+        sys.exit()
+
+    if piece == 'p' or was_capture:
+        halfmove_clock = 0
+    else:
+        halfmove_clock += 1
+
+    # Check for 50-move rule draw (unchanged)
+    if halfmove_clock >= 100:
+        return halfmove_clock, True  # Game is a draw
+    else:
+        return halfmove_clock, False  # Game continues
+
+def check_for_check(position):
+    for square in position:
+        if square is not None:
+            valid_moves = check_valid_moves(position[square], position, square, en_passant_index=-1, castling_availability=[], active_colour='b')
+            for move in valid_moves:
+                if position[move].lower() == 'k':
+                    return True
+    
+    return False
+
 def main():
 
     castling_availability = ['K', 'Q', 'k', 'q']
+    halfmove_toggle = True
     
     # Read the FEN position
-    result = read_fen_position('0.0_Position_fen.txt')
+    result = read_fen_position('6.0_Position_fen.txt')
     if result is None:
         print(f"Error reading FEN position.\tResult: {result}")
         sys.exit()
     else:
-        position, active_colour, castling, en_passant, halfmove, fullmove, fen_text = result
+        position, active_colour, castling_availability, en_passant, halfmove, fullmove, fen_text = result
     
     print(f"active colour: {active_colour}")
 
@@ -549,6 +581,8 @@ def main():
         'a1': 56, 'b1': 57, 'c1': 58, 'd1': 59, 'e1': 60, 'f1': 61, 'g1': 62, 'h1': 63
     }
 
+    index_to_grid = {v: k for k, v in grid_to_index.items()}
+
     if en_passant == '-':
         en_passant_index = -1
     else:
@@ -563,7 +597,7 @@ def main():
     debounce_time = 0.1  # 100 milliseconds debounce time
     last_click_time = 0
 
-    draw_game(position, active_colour, castling, en_passant, halfmove, fullmove)
+    draw_game(position, active_colour, castling_availability, en_passant, halfmove, fullmove)
 
     while running:
 
@@ -580,7 +614,7 @@ def main():
             elif event.type == pygame.VIDEORESIZE:
                 window_width, window_height = event.w, event.h
                 window = pygame.display.set_mode((window_width, window_height), pygame.RESIZABLE)
-                draw_game(position, active_colour, castling, en_passant, halfmove, fullmove)
+                draw_game(position, active_colour, castling_availability, en_passant, halfmove, fullmove)
 
             # Get the mouse position
             x, y = pygame.mouse.get_pos()
@@ -594,34 +628,155 @@ def main():
 
             # If the mouse is within the grid
             if 0 <= i < 8 and 0 <= j < 8:
+                check = check_for_check(position)
                 # ** Selecting a square **
                 # If the mouse is clicked and there is no piece selected 
-                if event.type == pygame.MOUSEBUTTONDOWN and piece_selected == False:
-                    # left mouse button
-                    if event.button == 1:
-                        current_time = time.time()
-                        # Debounce logic
-                        if not mouse_button_held and (current_time - last_click_time > debounce_time):
-                            selected_square = i * 8 + j
-                            mouse_button_held = True
-                            last_click_time = current_time
-                            draw_board(board_x, board_y, board_size)
-                            pygame.draw.rect(window, (219, 194, 70, 50), (board_x + j * square_size, board_y + i * square_size, square_size + 1, square_size + 1))
-                            draw_pieces(position, board_x, board_y, board_size)
-                            if position[selected_square] is not None:
-                                draw_valid_moves(check_valid_moves(position[selected_square], position, selected_square, en_passant_index, castling, active_colour), board_x, board_y, square_size)
-                                piece_selected = True
-                            else:
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if piece_selected == False:
+                        # left mouse button
+                        if event.button == 1:
+                            current_time = time.time()
+                            # Debounce logic
+                            if not mouse_button_held and (current_time - last_click_time > debounce_time):
+                                selected_square = i * 8 + j
+                                mouse_button_held = True
+                                last_click_time = current_time
+                                draw_board(board_x, board_y, board_size)
+                                pygame.draw.rect(window, (219, 194, 70, 50), (board_x + j * square_size, board_y + i * square_size, square_size + 1, square_size + 1))
+                                draw_pieces(position, board_x, board_y, board_size)
+                                if position[selected_square] is not None:
+                                    valid_moves = check_valid_moves(position[selected_square], position, selected_square, en_passant_index, castling_availability, active_colour)
+                                    draw_valid_moves(valid_moves, board_x, board_y, square_size)
+                                    piece_selected = True
+                                else:
+                                    piece_selected = False
+                        
+                    if piece_selected == True:
+                        if event.button == 1:
+                            # ** Move the piece via clicking **
+                            current_time = time.time()
+
+                            if not mouse_button_held and (current_time - last_click_time > debounce_time):
+                                target_square = i * 8 + j
+                                target_rank = target_square // 8
+                                selected_rank = selected_square // 8
+                                mouse_button_held = True
+                                last_click_time = current_time
+                                valid_moves = check_valid_moves(position[selected_square], position, selected_square, en_passant_index, castling_availability, active_colour)
+
+                                if target_square in valid_moves:
+                                    # White Kingside Castling
+                                    if position[selected_square] == 'K' and target_square == 62:
+                                        position[61] = position[63]
+                                        position[63] = None
+                                        castling_availability.remove('K')
+
+                                    # Black Kingside Castling
+                                    if position[selected_square] == 'k' and target_square == 6:
+                                        position[5] = position[7]
+                                        position[7] = None
+                                        castling_availability.remove('k')
+                                    
+                                    # White Queenside Castling
+                                    if position[selected_square] == 'K' and target_square == 58:
+                                        position[59] = position[56]
+                                        position[56] = None
+                                        castling_availability.remove('Q')
+
+                                    # Black Queenside Castling
+                                    if position[selected_square] == 'k' and target_square == 2:
+                                        position[3] = position[0]
+                                        position[0] = None
+                                        castling_availability.remove('q')
+                                    
+                                    # En Passant implementation
+                                    if target_square == en_passant_index:
+                                        if position[selected_square] == 'P':
+                                            position[target_square + 8] = None
+                                        if position[selected_square] == 'p':
+                                            position[target_square - 8] = None
+                                        was_capture = True
+                                    
+                                    # fullmove counter update
+                                    if active_colour == 'w':
+                                        fullmove += 1
+
+
+                                    # Updating castling_availability
+                                    if (selected_square == 63 or selected_square == 60) and 'K' in castling_availability:
+                                        castling_availability.remove('K')
+                                        
+                                    elif (selected_square == 56 or selected_square == 60) and 'Q' in castling_availability:
+                                        castling_availability.remove('Q')
+                                        
+                                    elif (selected_square == 7 or selected_square == 4) and 'k'  in castling_availability:
+                                        castling_availability.remove('k')
+                                        
+                                    elif (selected_square == 0 or selected_square == 4) and 'q' in castling_availability:
+                                        castling_availability.remove('q')
+                                        
+                                    # Updating En Passant square
+                                    if selected_rank == 6 and target_rank == 4:
+                                        en_passant_index = (target_rank + 1) * 8 + j
+                                        en_passant_target = index_to_grid.get(en_passant_index)
+                                    elif selected_rank == 1 and target_rank == 3:
+                                        en_passant_index = (target_rank - 1) * 8 + j
+                                        en_passant_target = index_to_grid.get(en_passant_index)
+                                    else:
+                                        en_passant_index = -1
+                                        en_passant_target = '-'
+                                        
+                                    # print(f"**Debug**\twas_capture being determined\tposition[target_square]: {position[target_square]}")
+                                    if position[target_square] is not None:
+                                        was_capture = True
+                                    else:
+                                        was_capture = False
+                                    position[target_square] = position[selected_square]
+                                    position[selected_square] = None
+                                    active_colour = 'b' if active_colour == 'w' else 'w'
+
+                                    halfmove, is_draw = update_halfmove_clock(position, target_square, halfmove, was_capture)
+
+                                    if target_square == en_passant_index:
+                                        if target_rank == 2:
+                                            position[target_square + 8] = None
+                                        if target_rank == 5:
+                                            position[target_square - 8] = None
+
+                                else:
+                                    draw_board(board_x, board_y, board_size)
+                                    pygame.draw.rect(window, (219, 194, 70, 50), (board_x + j * square_size, board_y + i * square_size, square_size + 1, square_size + 1))
+                                    draw_pieces(position, board_x, board_y, board_size)
+                                    if target_square is not None:
+                                        valid_moves = check_valid_moves(position[target_square], position, target_square, en_passant_index, castling_availability, active_colour)
+                                        draw_valid_moves(valid_moves, board_x, board_y, square_size)
+                                    if position[target_square] is not None:
+                                        piece_selected = True
+                                        selected_square = target_square
+                                    else:
+                                        piece_selected = False
+
+                        if event.button == 3:
+                            # ** Clear the selection **
+                            current_time = time.time()
+                            if not mouse_button_held and (current_time - last_click_time > debounce_time):
+                                mouse_button_held = True
+                                last_click_time = current_time
                                 piece_selected = False
+                                selected_square = -1
+                                valid_moves = []
+                                draw_game(position, active_colour, castling_availability, en_passant, halfmove, fullmove)
+                                    
 
                 if event.type == pygame.MOUSEBUTTONUP:
                     # ** Moving a piece via dragging **
                     target_square = i * 8 + j
-                    print(f"**Debug**\tevent.button: {event.button}\ttarget_square: {target_square}\tselected_square: {selected_square}")
+                    # print(f"**Debug**\tevent.button: {event.button}\ttarget_square: {target_square}\tselected_square: {selected_square}")
                     if event.button == 1 and target_square != selected_square:
                         mouse_button_held = False
                         if piece_selected:
-                            if target_square in check_valid_moves(position[selected_square], position, selected_square, en_passant_index, castling, active_colour):
+                            valid_moves = check_valid_moves(position[selected_square], position, selected_square, en_passant_index, castling_availability, active_colour)
+                            if target_square in valid_moves:
                                 
                                 # White Kingside Castling
                                 if position[selected_square] == 'K' and target_square == 62:
@@ -647,82 +802,16 @@ def main():
                                 position[target_square] = position[selected_square]
                                 position[selected_square] = None
 
-                                draw_game(position, active_colour, castling, en_passant, halfmove, fullmove)
+                                draw_game(position, active_colour, castling_availability, en_passant, halfmove, fullmove)
                                 piece_selected = False
                                 active_colour = 'b' if active_colour == 'w' else 'w'
                             else:
                                 piece_selected = False
-                                draw_game(position, active_colour, castling, en_passant, halfmove, fullmove)
+                                draw_game(position, active_colour, castling_availability, en_passant, halfmove, fullmove)
                         else:
-                            draw_game(position, active_colour, castling, en_passant, halfmove, fullmove)
-                
-                # Highlight the current piece and valid moves
-                if event.type == pygame.MOUSEBUTTONDOWN and piece_selected is True:
-                    if event.button == 3:
-                        # ** Clear the selection **
-                        current_time = time.time()
-                        if not mouse_button_held and (current_time - last_click_time > debounce_time):
-                            mouse_button_held = True
-                            last_click_time = current_time
-                            piece_selected = False
-                            draw_game(position, active_colour, castling, en_passant, halfmove, fullmove)
+                            draw_game(position, active_colour, castling_availability, en_passant, halfmove, fullmove)
 
-                    if event.button == 1:
-                        # ** Move the piece via clicking **
-                        current_time = time.time()
-
-                        if not mouse_button_held and (current_time - last_click_time > debounce_time):
-                            target_square = i * 8 + j
-                            rank = target_square // 8
-                            mouse_button_held = True
-                            last_click_time = current_time
-                            valid_moves = check_valid_moves(position[selected_square], position, selected_square, en_passant_index, castling, active_colour)
-
-                            if target_square in valid_moves:
-                                # White Kingside Castling
-                                if position[selected_square] == 'K' and target_square == 62:
-                                    position[61] = position[63]
-                                    position[63] = None
-
-                                # Black Kingside Castling
-                                if position[selected_square] == 'k' and target_square == 6:
-                                    position[5] = position[7]
-                                    position[7] = None
-                                
-                                # White Queenside Castling
-                                if position[selected_square] == 'K' and target_square == 58:
-                                    position[59] = position[56]
-                                    position[56] = None
-
-                                # Black Queenside Castling
-                                if position[selected_square] == 'k' and target_square == 2:
-                                    position[3] = position[0]
-                                    position[0] = None
-
-                                position[i * 8 + j] = position[selected_square]
-                                position[selected_square] = None
-                                active_colour = 'b' if active_colour == 'w' else 'w'
-
-                                if target_square == en_passant_index:
-                                    if rank == 2:
-                                        position[target_square + 8] = None
-                                    if rank == 5:
-                                        position[target_square - 8] = None
-
-
-                            else:
-                                draw_board(board_x, board_y, board_size)
-                                pygame.draw.rect(window, (219, 194, 70, 50), (board_x + j * square_size, board_y + i * square_size, square_size + 1, square_size + 1))
-                                draw_pieces(position, board_x, board_y, board_size)
-                                if target_square is not None:
-                                    draw_valid_moves(check_valid_moves(position[target_square], position, target_square, en_passant_index, castling, active_colour), board_x, board_y, square_size)
-                                if position[target_square] is not None:
-                                    piece_selected = True
-                                    selected_square = target_square
-                                else:
-                                    piece_selected = False
-
-                        new_fen = write_fen_position(position, active_colour, castling_availability=['K', 'Q', 'k', 'q'], en_passant_target='e3', halfmove=0, fullmove=0)
+                        new_fen = write_fen_position(position, active_colour, castling_availability, en_passant_target, halfmove, fullmove)
                         print(f"New FEN: {new_fen}")
 
                 # Check for mouse released event
